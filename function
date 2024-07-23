@@ -39,45 +39,57 @@ def metrics_table(y_pred, y_test, label_names):
     label_pred = y_pred
     label_true = y_test
     
-    micro_precision = precision_score(label_true, label_pred, average='micro')
-    micro_recall = recall_score(label_true, label_pred, average='micro')
-    micro_f1 = f1_score(label_true, label_pred, average='micro')
-    micro_f0_5 = fbeta_score(label_true, label_pred, average='micro', beta=0.5)
-    m_support = label_true.sum()
+    # Calculate and plot micro-average PR curve
+    micro_precision, micro_recall, _ = precision_recall_curve(label_true.ravel(), label_pred.ravel())
+    micro_auc = auc(micro_recall, micro_precision)
+    axes[n_labels].plot(micro_recall, micro_precision, lw=2, label=f'Micro Average AUC = {micro_auc:.2f}')
+    axes[n_labels].set_xlabel('Recall')
+    axes[n_labels].set_ylabel('Precision')
+    axes[n_labels].set_title('Micro Average PR Curve')
+    axes[n_labels].legend(loc='lower left')
+    axes[n_labels].grid(True)
     
     metrics.append({
         'Label': 'Micro Average',
-        'Precision': f'{micro_precision * 100:.2f}%',
-        'Recall': f'{micro_recall * 100:.2f}%',
-        'F1 Score': f'{micro_f1 * 100:.2f}%',
-        'F0.5 Score': f'{micro_f0_5 * 100:.2f}%',
-        'Support': f'{m_support:.0f}'
+        'Precision': f'{micro_precision.mean() * 100:.2f}%',
+        'Recall': f'{micro_recall.mean() * 100:.2f}%',
+        'F1 Score': f'{f1_score(label_true, label_pred, average="micro") * 100:.2f}%',
+        'F0.5 Score': f'{fbeta_score(label_true, label_pred, average="micro", beta=0.5) * 100:.2f}%',
+        'Support': f'{label_true.sum():.0f}',
+        'PR AUC': f'{micro_auc:.2f}'
     })
     
-    macro_precision = precision_score(label_true, label_pred, average='macro')
-    macro_recall = recall_score(label_true, label_pred, average='macro')
-    macro_f1 = f1_score(label_true, label_pred, average='macro')
-    macro_f0_5 = fbeta_score(label_true, label_pred, average='macro', beta=0.5)
+    # Calculate and plot macro-average PR curve
+    macro_precision, macro_recall, _ = precision_recall_curve(label_true.ravel(), label_pred.ravel(), average='macro')
+    macro_auc = auc(macro_recall, macro_precision)
+    axes[n_labels + 1].plot(macro_recall, macro_precision, lw=2, label=f'Macro Average AUC = {macro_auc:.2f}')
+    axes[n_labels + 1].set_xlabel('Recall')
+    axes[n_labels + 1].set_ylabel('Precision')
+    axes[n_labels + 1].set_title('Macro Average PR Curve')
+    axes[n_labels + 1].legend(loc='lower left')
+    axes[n_labels + 1].grid(True)
     
     metrics.append({
         'Label': 'Macro Average',
-        'Precision': f'{macro_precision * 100:.2f}%',
-        'Recall': f'{macro_recall * 100:.2f}%',
-        'F1 Score': f'{macro_f1 * 100:.2f}%',
-        'F0.5 Score': f'{macro_f0_5 * 100:.2f}%',
-        'Support': f'{m_support:.0f}'
+        'Precision': f'{precision_score(label_true, label_pred, average="macro") * 100:.2f}%',
+        'Recall': f'{recall_score(label_true, label_pred, average="macro") * 100:.2f}%',
+        'F1 Score': f'{f1_score(label_true, label_pred, average="macro") * 100:.2f}%',
+        'F0.5 Score': f'{fbeta_score(label_true, label_pred, average="macro", beta=0.5) * 100:.2f}%',
+        'Support': f'{label_true.sum():.0f}',
+        'PR AUC': f'{macro_auc:.2f}'
     })
     
     results_df = pd.DataFrame(metrics)
     
     # Hide any remaining empty subplots
-    for j in range(i + 1, len(axes)):
+    for j in range(n_labels + 2, len(axes)):
         fig.delaxes(axes[j])
     
     plt.tight_layout()
-    plt.show()
+    plt.show()  # Ensure the plot is displayed
     
     return results_df
+
 
 
 
