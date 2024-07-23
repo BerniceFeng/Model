@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_recall_curve, auc, precision_score, recall_score, f1_score, fbeta_score
+import numpy as np
+from sklearn.metrics import precision_recall_curve, auc, precision_score, recall_score, f1_score, fbeta_score, average_precision_score
 
 def metrics_table(y_pred, y_test, label_names):
     metrics = []
@@ -59,23 +60,19 @@ def metrics_table(y_pred, y_test, label_names):
         'PR AUC': f'{micro_auc:.2f}'
     })
     
-    # Calculate and plot macro-average PR curve
-    macro_precision = []
-    macro_recall = []
+    # Calculate macro-average precision-recall curve and AUC
+    macro_precision = average_precision_score(label_true, label_pred, average='macro')
+    macro_recall = np.linspace(0, 1, 100)
+    macro_precisions = []
+    
     for i in range(y_test.shape[1]):
         precision_curve, recall_curve, _ = precision_recall_curve(y_test[:, i], y_pred[:, i])
-        macro_precision.append(precision_curve)
-        macro_recall.append(recall_curve)
+        macro_precisions.append(np.interp(macro_recall, recall_curve[::-1], precision_curve[::-1]))
     
-    # Interpolating all curves to the same recall points and averaging
-    all_recalls = np.unique(np.concatenate(macro_recall))
-    mean_precision = np.zeros_like(all_recalls)
-    for recall_curve, precision_curve in zip(macro_recall, macro_precision):
-        mean_precision += np.interp(all_recalls, recall_curve, precision_curve)
-    mean_precision /= len(macro_precision)
-    macro_auc = auc(all_recalls, mean_precision)
+    mean_precision = np.mean(macro_precisions, axis=0)
+    macro_auc = auc(macro_recall, mean_precision)
     
-    axes[n_labels + 1].plot(all_recalls, mean_precision, lw=2, label=f'Macro Average AUC = {macro_auc:.2f}')
+    axes[n_labels + 1].plot(macro_recall, mean_precision, lw=2, label=f'Macro Average AUC = {macro_auc:.2f}')
     axes[n_labels + 1].set_xlabel('Recall')
     axes[n_labels + 1].set_ylabel('Precision')
     axes[n_labels + 1].set_title('Macro Average PR Curve')
