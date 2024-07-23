@@ -60,9 +60,22 @@ def metrics_table(y_pred, y_test, label_names):
     })
     
     # Calculate and plot macro-average PR curve
-    macro_precision, macro_recall, _ = precision_recall_curve(label_true.ravel(), label_pred.ravel(), average='macro')
-    macro_auc = auc(macro_recall, macro_precision)
-    axes[n_labels + 1].plot(macro_recall, macro_precision, lw=2, label=f'Macro Average AUC = {macro_auc:.2f}')
+    macro_precision = []
+    macro_recall = []
+    for i in range(y_test.shape[1]):
+        precision_curve, recall_curve, _ = precision_recall_curve(y_test[:, i], y_pred[:, i])
+        macro_precision.append(precision_curve)
+        macro_recall.append(recall_curve)
+    
+    # Interpolating all curves to the same recall points and averaging
+    all_recalls = np.unique(np.concatenate(macro_recall))
+    mean_precision = np.zeros_like(all_recalls)
+    for recall_curve, precision_curve in zip(macro_recall, macro_precision):
+        mean_precision += np.interp(all_recalls, recall_curve, precision_curve)
+    mean_precision /= len(macro_precision)
+    macro_auc = auc(all_recalls, mean_precision)
+    
+    axes[n_labels + 1].plot(all_recalls, mean_precision, lw=2, label=f'Macro Average AUC = {macro_auc:.2f}')
     axes[n_labels + 1].set_xlabel('Recall')
     axes[n_labels + 1].set_ylabel('Precision')
     axes[n_labels + 1].set_title('Macro Average PR Curve')
@@ -89,36 +102,3 @@ def metrics_table(y_pred, y_test, label_names):
     plt.show()  # Ensure the plot is displayed
     
     return results_df
-
-
-
-
-
-class ConvNet(nn.Module):
-    def __init__(self, output_size, hidden_size, dropout_rate):
-        super(ConvNet, self).__init__()
-        self.conv1 = nn.Conv2d(1, hidden_size, kernel_size=(3, 1))
-        self.bn1 = nn.BatchNorm2d(hidden_size)
-        self.dropout1 = nn.Dropout(dropout_rate)
-        self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=(3, 1))
-        self.bn2 = nn.BatchNorm2d(hidden_size)
-        self.dropout2 = nn.Dropout(dropout_rate)
-        self.fc_input_dim = self._get_conv_output_dim()
-        self.fc = nn.Linear(self.fc_input_dim, output_size)
-
-    def _get_conv_output_dim(self):
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, 1, n_features, 1)
-            x = self.conv1(dummy_input)
-            x = self.conv2(x)
-            x = x.view(1, -1)
-            return x.size(1)
-
-    def forward(self, x):
-        x = torch.relu(self.bn1(self.conv1(x)))
-        x = self.dropout1(x)
-        x = torch.relu(self.bn2(self.conv2(x)))
-        x = self.dropout2(x)
-        x = x.view(x.size(0), -1)  # Flatten the tensor
-        x = torch.sigmoid(self.fc(x))  # For multilabel classification
-        return x
