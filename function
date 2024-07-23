@@ -1,97 +1,19 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from sklearn.metrics import f1_score
-
 class CNN(nn.Module):
-    def __init__(self, input_channels, hidden_size, output_size, dropout_rate):
-        super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.fc1 = nn.Linear(64 * 7 * 7, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, output_size)
-        self.dropout = nn.Dropout(dropout_rate)
+    def __init__(self, output_size, hidden_size, dropout_rate):
+        super(ConvNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, hidden_size, kernel_size=(3, 1))
+        self.bn1 = nn.BatchNorm2d(hidden_size)
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=(3, 1))
+        self.bn2 = nn.BatchNorm2d(hidden_size)
+        self.dropout2 = nn.Dropout(dropout_rate)
+        self.fc = nn.Linear((n_features - 4) * hidden_size, output_size)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
-        x = x.view(-1, 64 * 7 * 7)  # Flatten the tensor
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
+        x = torch.relu(self.bn1(self.conv1(x)))
+        x = self.dropout1(x)
+        x = torch.relu(self.bn2(self.conv2(x)))
+        x = self.dropout2(x)
+        x = x.view(x.size(0), -1)  # Flatten the tensor
+        x = torch.sigmoid(self.fc(x)
         return x
-
-
-
-def train_cnn_model(X_train, y_train, X_val, y_val, input_channels=1, hidden_size=128, output_size=10, dropout_rate=0.5, lr=1e-3, batch_size=32, epochs=10, patience=5):
-    # Convert data to PyTorch tensors and reshape for CNN
-    x_train_tensor = torch.tensor(X_train, dtype=torch.float32).view(-1, input_channels, 28, 28)
-    y_train_tensor = torch.tensor(y_train, dtype=torch.long)
-    x_val_tensor = torch.tensor(X_val, dtype=torch.float32).view(-1, input_channels, 28, 28)
-    y_val_tensor = torch.tensor(y_val, dtype=torch.long)
-
-    train_dataset = torch.utils.data.TensorDataset(x_train_tensor, y_train_tensor)
-    val_dataset = torch.utils.data.TensorDataset(x_val_tensor, y_val_tensor)
-
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-    # Initialize the CNN model
-    model = CNN(input_channels, hidden_size, output_size, dropout_rate)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-
-    # Training loop with early stopping
-    best_val_f1 = 0
-    best_model = None
-    trigger_times = 0
-
-    for epoch in range(epochs):
-        model.train()
-        for x_batch, y_batch in train_loader:
-            optimizer.zero_grad()
-            outputs = model(x_batch)
-            loss = criterion(outputs, y_batch)
-            loss.backward()
-            optimizer.step()
-
-        # Validation
-        model.eval()
-        with torch.no_grad():
-            val_outputs = model(x_val_tensor)
-            val_preds = torch.argmax(val_outputs, dim=1)
-            val_f1 = f1_score(y_val_tensor, val_preds, average='macro')
-
-        if val_f1 > best_val_f1:
-            best_val_f1 = val_f1
-            best_model = model.state_dict()
-            trigger_times = 0
-        else:
-            trigger_times += 1
-
-        if trigger_times >= patience:
-            break
-
-    # Save the best model
-    if best_model:
-        model.load_state_dict(best_model)
-        torch.save(model.state_dict(), './models/best_cnn_model.pth')
-
-    return model, best_val_f1
-
-
-
-# Example data (replace with your actual data)
-X_train = np.random.rand(1000, 28, 28)  # Replace with actual data
-y_train = np.random.randint(0, 10, 1000)  # Replace with actual labels
-X_val = np.random.rand(200, 28, 28)  # Replace with actual data
-y_val = np.random.randint(0, 10, 200)  # Replace with actual labels
-
-# Train the model
-model, best_val_f1 = train_cnn_model(X_train, y_train, X_val, y_val, input_channels=1, hidden_size=128, output_size=10, dropout_rate=0.5, lr=1e-3, batch_size=32, epochs=10, patience=5)
-
-print(f'Best validation F1 score: {best_val_f1}')
