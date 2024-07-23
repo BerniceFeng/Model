@@ -1,3 +1,87 @@
+import matplotlib.pyplot as plt
+from sklearn.metrics import precision_recall_curve, auc, precision_score, recall_score, f1_score, fbeta_score
+
+def metrics_table(y_pred, y_test, label_names):
+    metrics = []
+    n_labels = len(label_names)
+    fig, axes = plt.subplots(5, 3, figsize=(15, 20))
+    axes = axes.ravel()  # Flatten the 5x3 array of axes
+    
+    for i in range(y_test.shape[1]):
+        precision = precision_score(y_test[:, i], y_pred[:, i])
+        recall = recall_score(y_test[:, i], y_pred[:, i])
+        f1 = f1_score(y_test[:, i], y_pred[:, i])
+        f0_5 = fbeta_score(y_test[:, i], y_pred[:, i], beta=0.5)
+        support = y_test[:, i].sum()
+        
+        # Calculate precision-recall curve and AUC
+        precision_curve, recall_curve, _ = precision_recall_curve(y_test[:, i], y_pred[:, i])
+        pr_auc = auc(recall_curve, precision_curve)
+        
+        # Plot the PR curve in the corresponding subplot
+        axes[i].plot(recall_curve, precision_curve, lw=2, label=f'AUC = {pr_auc:.2f}')
+        axes[i].set_xlabel('Recall')
+        axes[i].set_ylabel('Precision')
+        axes[i].set_title(f'{label_names[i]} PR Curve')
+        axes[i].legend(loc='lower left')
+        axes[i].grid(True)
+        
+        metrics.append({
+            'Label': label_names[i],
+            'Precision': f'{precision * 100:.2f}%',
+            'Recall': f'{recall * 100:.2f}%',
+            'F1 Score': f'{f1 * 100:.2f}%',
+            'F0.5 Score': f'{f0_5 * 100:.2f}%',
+            'Support': f'{support:.0f}',
+            'PR AUC': f'{pr_auc:.2f}'
+        })
+    
+    label_pred = y_pred
+    label_true = y_test
+    
+    micro_precision = precision_score(label_true, label_pred, average='micro')
+    micro_recall = recall_score(label_true, label_pred, average='micro')
+    micro_f1 = f1_score(label_true, label_pred, average='micro')
+    micro_f0_5 = fbeta_score(label_true, label_pred, average='micro', beta=0.5)
+    m_support = label_true.sum()
+    
+    metrics.append({
+        'Label': 'Micro Average',
+        'Precision': f'{micro_precision * 100:.2f}%',
+        'Recall': f'{micro_recall * 100:.2f}%',
+        'F1 Score': f'{micro_f1 * 100:.2f}%',
+        'F0.5 Score': f'{micro_f0_5 * 100:.2f}%',
+        'Support': f'{m_support:.0f}'
+    })
+    
+    macro_precision = precision_score(label_true, label_pred, average='macro')
+    macro_recall = recall_score(label_true, label_pred, average='macro')
+    macro_f1 = f1_score(label_true, label_pred, average='macro')
+    macro_f0_5 = fbeta_score(label_true, label_pred, average='macro', beta=0.5)
+    
+    metrics.append({
+        'Label': 'Macro Average',
+        'Precision': f'{macro_precision * 100:.2f}%',
+        'Recall': f'{macro_recall * 100:.2f}%',
+        'F1 Score': f'{macro_f1 * 100:.2f}%',
+        'F0.5 Score': f'{macro_f0_5 * 100:.2f}%',
+        'Support': f'{m_support:.0f}'
+    })
+    
+    results_df = pd.DataFrame(metrics)
+    
+    # Hide any remaining empty subplots
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return results_df
+
+
+
+
 class ConvNet(nn.Module):
     def __init__(self, output_size, hidden_size, dropout_rate):
         super(ConvNet, self).__init__()
